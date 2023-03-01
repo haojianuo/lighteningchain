@@ -28,8 +28,6 @@ func (b *Block) GetDataBaseNonce(nonce int64) []byte {
 	return data
 }
 
-//proofofwork.go
-
 func (b *Block) FindNonce() int64 {
 	var intHash big.Int
 	var intTarget big.Int
