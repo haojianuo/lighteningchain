@@ -21,7 +21,7 @@ func (b *Block) GetDataBaseNonce(nonce int64) []byte {
 		b.PrevHash,
 		utils.Int64ToByte(nonce),
 		b.Target,
-		b.Data,
+		b.BackTXSummary(),
 	},
 		[]byte{},
 	)
