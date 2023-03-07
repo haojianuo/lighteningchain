@@ -1,41 +1,180 @@
 package blockchain
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/dgraph-io/badger"
+	"lighteningchain/constcoe"
 	"lighteningchain/transaction"
 	"lighteningchain/utils"
+	"runtime"
 )
 
 type BlockChain struct {
-	Blocks []*Block
+	LastHash []byte
+	Database *badger.DB
+}
+type BlockChainIterator struct {
+	CurrentHash []byte
+	Database    *badger.DB
 }
 
-func (bc *BlockChain) AddBlock(txs []*transaction.Transaction) {
-	newBlock := CreateBlock(bc.Blocks[len(bc.Blocks)-1].Hash, txs)
-	bc.Blocks = append(bc.Blocks, newBlock)
+func (chain *BlockChain) Iterator() *BlockChainIterator {
+	iterator := BlockChainIterator{chain.LastHash, chain.Database}
+	return &iterator
 }
 
-// CreateBlockChain 初始化区块链
-func CreateBlockChain() *BlockChain {
-	myBlockchain := BlockChain{}
-	myBlockchain.Blocks = append(myBlockchain.Blocks, GenesisBlock())
-	return &myBlockchain
+// Next 开始迭代
+func (iterator *BlockChainIterator) Next() *Block {
+	var block *Block
+
+	err := iterator.Database.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(iterator.CurrentHash)
+		utils.Handle(err)
+
+		err = item.Value(func(val []byte) error {
+			block = DeSerializeBlock(val)
+			return nil
+		})
+		utils.Handle(err)
+		return err
+	})
+	utils.Handle(err)
+
+	iterator.CurrentHash = block.PrevHash
+
+	return block
+}
+
+// BackOgPrevHash 判断迭代器是否终止
+func (chain *BlockChain) BackOgPrevHash() []byte {
+	var ogprevhash []byte
+	err := chain.Database.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte("ogprevhash"))
+		utils.Handle(err)
+
+		err = item.Value(func(val []byte) error {
+			ogprevhash = val
+			return nil
+		})
+
+		utils.Handle(err)
+		return err
+	})
+	utils.Handle(err)
+
+	return ogprevhash
+}
+func (bc *BlockChain) AddBlock(newBlock *Block) {
+	var lastHash []byte
+
+	err := bc.Database.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte("lh"))
+		utils.Handle(err)
+		err = item.Value(func(val []byte) error {
+			lastHash = val
+			return nil
+		})
+		utils.Handle(err)
+
+		return err
+	})
+	utils.Handle(err)
+	if !bytes.Equal(newBlock.PrevHash, lastHash) {
+		fmt.Println("This block is out of age")
+		runtime.Goexit()
+	}
+
+	err = bc.Database.Update(func(transaction *badger.Txn) error {
+		err := transaction.Set(newBlock.Hash, newBlock.Serialize())
+		utils.Handle(err)
+		err = transaction.Set([]byte("lh"), newBlock.Hash)
+		bc.LastHash = newBlock.Hash
+		return err
+	})
+	utils.Handle(err)
+}
+
+// // CreateBlockChain 初始化区块链
+//
+//	func CreateBlockChain() *BlockChain {
+//		myBlockchain := BlockChain{}
+//		myBlockchain.Blocks = append(myBlockchain.Blocks, GenesisBlock())
+//		return &myBlockchain
+//	}
+func InitBlockChain(address []byte) *BlockChain {
+	var lastHash []byte
+
+	if utils.FileExists(constcoe.BCFile) {
+		fmt.Println("blockchain already exists")
+		runtime.Goexit()
+	}
+
+	opts := badger.DefaultOptions(constcoe.BCPath)
+	opts.Logger = nil
+
+	db, err := badger.Open(opts)
+	utils.Handle(err)
+
+	err = db.Update(func(txn *badger.Txn) error {
+		genesis := GenesisBlock(address)
+		fmt.Println("Genesis Created")
+		err = txn.Set(genesis.Hash, genesis.Serialize())
+		utils.Handle(err)
+		err = txn.Set([]byte("lh"), genesis.Hash) //store the hash of the block in blockchain
+		utils.Handle(err)
+		err = txn.Set([]byte("ogprevhash"), genesis.PrevHash) //store the prevhash of genesis(original) block
+		utils.Handle(err)
+		lastHash = genesis.Hash
+		return err
+	})
+	utils.Handle(err)
+	blockchain := BlockChain{lastHash, db}
+	return &blockchain
+}
+func LoadBlockChain() *BlockChain {
+	if utils.FileExists(constcoe.BCFile) == false {
+		fmt.Println("No blockchain found, please create one first")
+		runtime.Goexit()
+	}
+
+	var lastHash []byte
+
+	opts := badger.DefaultOptions(constcoe.BCPath)
+	opts.Logger = nil
+	db, err := badger.Open(opts)
+	utils.Handle(err)
+
+	err = db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte("lh"))
+		utils.Handle(err)
+		err = item.Value(func(val []byte) error {
+			lastHash = val
+			return nil
+		})
+		utils.Handle(err)
+		return err
+	})
+	utils.Handle(err)
+
+	chain := BlockChain{lastHash, db}
+	return &chain
 }
 
 func (bc *BlockChain) FindUnspentTransactions(address []byte) []transaction.Transaction {
 	var unSpentTxs []transaction.Transaction
-	spentTxs := make(map[string][]int)
-	//unSpentTxs就是我们要返回包含指定地址的可用交易信息的切片
-	//spentTxs用于记录遍历区块链时那些已经被使用的交易信息的Output
-	//key值为交易信息的ID值（需要转成string）
-	//value值为Output在该交易信息中的序号
+	spentTxs := make(map[string][]int) // can't use type []byte as key value
 
-	for idx := len(bc.Blocks) - 1; idx >= 0; idx-- {
-		block := bc.Blocks[idx]
+	iter := bc.Iterator()
+
+all:
+	for {
+		block := iter.Next()
+
 		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
-			//从最后一个区块开始向前遍历区块链，然后遍历每一个区块中的交易信息
+
 		IterOutputs:
 			for outIdx, out := range tx.Outputs {
 				if spentTxs[txID] != nil {
@@ -45,13 +184,11 @@ func (bc *BlockChain) FindUnspentTransactions(address []byte) []transaction.Tran
 						}
 					}
 				}
-				//遍历交易信息的Output，如果该Output在spentTxs中就跳过，说明该Output已被消费。
 
 				if out.ToAddressRight(address) {
 					unSpentTxs = append(unSpentTxs, *tx)
 				}
 			}
-			//否则确认ToAddress正确与否，正确就是我们要找的可用交易信息。
 			if !tx.IsBase() {
 				for _, in := range tx.Inputs {
 					if in.FromAddressRight(address) {
@@ -60,9 +197,9 @@ func (bc *BlockChain) FindUnspentTransactions(address []byte) []transaction.Tran
 					}
 				}
 			}
-			//检查当前交易信息是否为Base Transaction（主要是它没有input）
-			//如果不是就检查当前交易信息的input中是否包含目标地址
-			//有的话就将指向的Output信息加入到spentTxs中
+		}
+		if bytes.Equal(block.PrevHash, bc.BackOgPrevHash()) {
+			break all
 		}
 	}
 	return unSpentTxs
@@ -120,20 +257,16 @@ func (bc *BlockChain) CreateTransaction(from, to []byte, amount int) (*transacti
 	for txid, outidx := range validOutputs {
 		txID, err := hex.DecodeString(txid)
 		utils.Handle(err)
-		input := transaction.TxInput{txID, outidx, from}
+		input := transaction.TxInput{TxID: txID, OutIdx: outidx, FromAddress: from}
 		inputs = append(inputs, input)
 	}
 
-	outputs = append(outputs, transaction.TxOutput{amount, to})
+	outputs = append(outputs, transaction.TxOutput{Value: amount, ToAddress: to})
 	if acc > amount {
-		outputs = append(outputs, transaction.TxOutput{acc - amount, from})
+		outputs = append(outputs, transaction.TxOutput{Value: acc - amount, ToAddress: from})
 	}
-	tx := transaction.Transaction{nil, inputs, outputs}
+	tx := transaction.Transaction{Inputs: inputs, Outputs: outputs}
 	tx.SetID()
 
 	return &tx, true
-}
-
-func (bc *BlockChain) Mine(txs []*transaction.Transaction) {
-	bc.AddBlock(txs)
 }

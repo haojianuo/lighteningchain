@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/binary"
 	"log"
+	"os"
 )
 
 func Int64ToByte(num int64) []byte {
@@ -15,4 +16,11 @@ func Handle(err error) {
 	if err != nil {
 		log.Panic(err)
 	}
+}
+
+func FileExists(fileAddr string) bool {
+	if _, err := os.Stat(fileAddr); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
