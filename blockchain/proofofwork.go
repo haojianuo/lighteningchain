@@ -32,7 +32,7 @@ func (b *Block) FindNonce() int64 {
 	var intHash big.Int
 	var intTarget big.Int
 
-	intTarget.SetBytes(b.Target)
+	intTarget.SetBytes(b.Target) //将b.Target转换为big.Int类型
 
 	var hash [32]byte
 	var nonce int64

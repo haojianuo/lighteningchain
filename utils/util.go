@@ -6,9 +6,10 @@ import (
 	"os"
 )
 
+// Int64ToByte int64转换为byte数组
 func Int64ToByte(num int64) []byte {
 	var buf = make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, uint64(num))
+	binary.BigEndian.PutUint64(buf, uint64(num)) //将num转换为uint64后存入buf
 	return buf
 }
 

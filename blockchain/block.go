@@ -18,7 +18,7 @@ type Block struct {
 	Transactions []*transaction.Transaction
 }
 
-func (b *Block) BackTXSummary() []byte {
+func (b *Block) BackTXSummary() []byte { //返回区块中所有交易的ID的集合
 	txIDs := make([][]byte, 0)
 	for _, tx := range b.Transactions {
 		txIDs = append(txIDs, tx.ID)

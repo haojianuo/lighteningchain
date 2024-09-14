@@ -96,13 +96,6 @@ func (bc *BlockChain) AddBlock(newBlock *Block) {
 	utils.Handle(err)
 }
 
-// // CreateBlockChain 初始化区块链
-//
-//	func CreateBlockChain() *BlockChain {
-//		myBlockchain := BlockChain{}
-//		myBlockchain.Blocks = append(myBlockchain.Blocks, GenesisBlock())
-//		return &myBlockchain
-//	}
 func InitBlockChain(address []byte) *BlockChain {
 	var lastHash []byte
 
