@@ -1,30 +1,32 @@
 package utils
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
-	"github.com/mr-tron/base58"
-	"golang.org/x/crypto/ripemd160"
 	"lighteningchain/constcoe"
 	"log"
 	"math/big"
 	"os"
-)
 
-// Int64ToByte int64转换为byte数组
-func Int64ToByte(num int64) []byte {
-	var buf = make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, uint64(num)) //将num转换为uint64后存入buf
-	return buf
-}
+	"github.com/mr-tron/base58"
+	"golang.org/x/crypto/ripemd160"
+)
 
 func Handle(err error) {
 	if err != nil {
 		log.Panic(err)
 	}
+}
+
+func ToHexInt(num int64) []byte {
+	buff := new(bytes.Buffer)
+	err := binary.Write(buff, binary.BigEndian, num)
+	Handle(err)
+	return buff.Bytes()
 }
 
 func FileExists(fileAddr string) bool {
@@ -34,7 +36,6 @@ func FileExists(fileAddr string) bool {
 	return true
 }
 
-// PublicKeyHash 生成公钥哈希
 func PublicKeyHash(publicKey []byte) []byte {
 	hashedPublicKey := sha256.Sum256(publicKey)
 	hasher := ripemd160.New()
@@ -49,6 +50,7 @@ func CheckSum(ripeMdHash []byte) []byte {
 	secondHash := sha256.Sum256(firstHash[:])
 	return secondHash[:constcoe.CheckSumLength]
 }
+
 func Base58Encode(input []byte) []byte {
 	encode := base58.Encode(input)
 	return []byte(encode)
@@ -60,7 +62,6 @@ func Base58Decode(input []byte) []byte {
 	return decode
 }
 
-// PubHash2Address 通过公钥生成地址
 func PubHash2Address(pubKeyHash []byte) []byte {
 	networkVersionedHash := append([]byte{constcoe.NetworkVersion}, pubKeyHash...)
 	checkSum := CheckSum(networkVersionedHash)
@@ -96,6 +97,6 @@ func Verify(msg []byte, pubkey []byte, signature []byte) bool {
 	x.SetBytes(pubkey[:(keyLen / 2)])
 	y.SetBytes(pubkey[(keyLen / 2):])
 
-	rawPubKey := ecdsa.PublicKey{Curve: curve, X: &x, Y: &y}
+	rawPubKey := ecdsa.PublicKey{curve, &x, &y}
 	return ecdsa.Verify(&rawPubKey, msg, &r, &s)
 }

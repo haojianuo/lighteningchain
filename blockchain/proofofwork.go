@@ -17,11 +17,11 @@ func (b *Block) GetTarget() []byte {
 
 func (b *Block) GetDataBaseNonce(nonce int64) []byte {
 	data := bytes.Join([][]byte{
-		utils.Int64ToByte(b.Timestamp),
+		utils.ToHexInt(b.Timestamp),
 		b.PrevHash,
-		utils.Int64ToByte(nonce),
+		utils.ToHexInt(nonce),
 		b.Target,
-		b.BackTXSummary(),
+		b.BackTrasactionSummary(),
 	},
 		[]byte{},
 	)

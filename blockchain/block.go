@@ -1,9 +1,11 @@
+// block.go
 package blockchain
 
 import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
+	"lighteningchain/merkletree"
 	"lighteningchain/transaction"
 	"lighteningchain/utils"
 	"time"
@@ -11,43 +13,42 @@ import (
 
 type Block struct {
 	Timestamp    int64
-	Hash         []byte //区块hash值就是其ID
+	Hash         []byte
 	PrevHash     []byte
-	Nonce        int64
 	Target       []byte
+	Nonce        int64
 	Transactions []*transaction.Transaction
+	MTree        *merkletree.MerkleTree
 }
 
-func (b *Block) BackTXSummary() []byte { //返回区块中所有交易的ID的集合
+func (b *Block) SetHash() {
+	information := bytes.Join([][]byte{utils.ToHexInt(b.Timestamp), b.PrevHash, b.Target, utils.ToHexInt(b.Nonce), b.BackTrasactionSummary(), b.MTree.RootNode.Data}, []byte{})
+	hash := sha256.Sum256(information)
+	b.Hash = hash[:]
+}
+
+func CreateBlock(prevhash []byte, txs []*transaction.Transaction) *Block {
+	block := Block{time.Now().Unix(), []byte{}, prevhash, []byte{}, 0, txs, merkletree.CrateMerkleTree(txs)}
+	block.Target = block.GetTarget()
+	block.Nonce = block.FindNonce()
+	block.SetHash()
+	return &block
+}
+
+func GenesisBlock(address []byte) *Block {
+	tx := transaction.BaseTx(address)
+	genesis := CreateBlock([]byte("Leo Cao is awesome!"), []*transaction.Transaction{tx})
+	genesis.SetHash()
+	return genesis
+}
+
+func (b *Block) BackTrasactionSummary() []byte {
 	txIDs := make([][]byte, 0)
 	for _, tx := range b.Transactions {
 		txIDs = append(txIDs, tx.ID)
 	}
 	summary := bytes.Join(txIDs, []byte{})
 	return summary
-}
-
-func (b *Block) SetHash() {
-	information := bytes.Join([][]byte{utils.Int64ToByte(b.Timestamp),
-		b.PrevHash, b.Target, utils.Int64ToByte(b.Nonce), b.BackTXSummary()}, []byte{})
-	hash := sha256.Sum256(information)
-	b.Hash = hash[:]
-}
-
-func CreateBlock(prevhash []byte, txs []*transaction.Transaction) *Block {
-	block := Block{time.Now().Unix(), []byte{},
-		prevhash, 0, []byte{}, txs}
-	block.Target = block.GetTarget()
-	block.Nonce = block.FindNonce()
-	block.SetHash() //所有数据添加好后再计算hash
-	return &block
-}
-
-func GenesisBlock(address []byte) *Block {
-	tx := transaction.BaseTx(address)
-	genesis := CreateBlock([]byte("This is nothing"), []*transaction.Transaction{tx})
-	genesis.SetHash()
-	return genesis
 }
 
 func (b *Block) Serialize() []byte {
