@@ -100,3 +100,11 @@ func Verify(msg []byte, pubkey []byte, signature []byte) bool {
 	rawPubKey := ecdsa.PublicKey{curve, &x, &y}
 	return ecdsa.Verify(&rawPubKey, msg, &r, &s)
 }
+
+func ToInt64(num []byte) int64 {
+	var num64 int64
+	buff := bytes.NewBuffer(num)
+	err := binary.Read(buff, binary.BigEndian, &num64)
+	Handle(err)
+	return num64
+}

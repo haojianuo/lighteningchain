@@ -15,6 +15,7 @@ type Block struct {
 	Timestamp    int64
 	Hash         []byte
 	PrevHash     []byte
+	Height       int64
 	Target       []byte
 	Nonce        int64
 	Transactions []*transaction.Transaction
@@ -27,8 +28,8 @@ func (b *Block) SetHash() {
 	b.Hash = hash[:]
 }
 
-func CreateBlock(prevhash []byte, txs []*transaction.Transaction) *Block {
-	block := Block{time.Now().Unix(), []byte{}, prevhash, []byte{}, 0, txs, merkletree.CrateMerkleTree(txs)}
+func CreateBlock(prevhash []byte, height int64, txs []*transaction.Transaction) *Block {
+	block := Block{time.Now().Unix(), []byte{}, prevhash, height, []byte{}, 0, txs, merkletree.CrateMerkleTree(txs)}
 	block.Target = block.GetTarget()
 	block.Nonce = block.FindNonce()
 	block.SetHash()
@@ -37,7 +38,7 @@ func CreateBlock(prevhash []byte, txs []*transaction.Transaction) *Block {
 
 func GenesisBlock(address []byte) *Block {
 	tx := transaction.BaseTx(address)
-	genesis := CreateBlock([]byte("Leo Cao is awesome!"), []*transaction.Transaction{tx})
+	genesis := CreateBlock([]byte("Arno is awesome!"), 0, []*transaction.Transaction{tx})
 	genesis.SetHash()
 	return genesis
 }

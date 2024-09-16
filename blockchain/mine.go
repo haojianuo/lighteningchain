@@ -18,7 +18,7 @@ func (bc *BlockChain) RunMine() {
 		return
 	}
 
-	candidateBlock := CreateBlock(bc.LastHash, transactionPool.Txs) //PoW has been done here.
+	candidateBlock := CreateBlock(bc.LastHash, bc.BackHeight()+1, transactionPool.Txs) //PoW has been done here.
 	if candidateBlock.ValidatePoW() {
 		bc.AddBlock(candidateBlock)
 		err := RemoveTransactionPoolFile()

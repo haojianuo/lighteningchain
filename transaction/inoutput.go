@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"bytes"
+	"encoding/gob"
 	"lighteningchain/utils"
 )
 
@@ -23,4 +24,26 @@ func (in *TxInput) FromAddressRight(address []byte) bool {
 
 func (out *TxOutput) ToAddressRight(address []byte) bool {
 	return bytes.Equal(out.HashPubKey, utils.PublicKeyHash(address))
+}
+
+type UTXO struct {
+	TxID   []byte
+	OutIdx int
+	TxOutput
+}
+
+func (u *UTXO) Serialize() []byte {
+	var res bytes.Buffer
+	encoder := gob.NewEncoder(&res)
+	err := encoder.Encode(u)
+	utils.Handle(err)
+	return res.Bytes()
+}
+
+func DeserializeUTXO(data []byte) *UTXO {
+	var utxo UTXO
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(&utxo)
+	utils.Handle(err)
+	return &utxo
 }

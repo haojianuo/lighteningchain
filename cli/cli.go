@@ -15,12 +15,14 @@ import (
 type CommandLine struct{}
 
 func (cli *CommandLine) printUsage() {
-	fmt.Println("Welcome to Leo Cao's tiny blockchain system, usage is as follows:")
+	fmt.Println("Welcome to Arno's tiny blockchain system, usage is as follows:")
 	fmt.Println("---------------------------------------------------------------------------------------------------------------------------------------------------------")
 	fmt.Println("All you need is to first create a wallet.")
 	fmt.Println("And then you can use the wallet address to create a blockchain and declare the owner.")
 	fmt.Println("Make transactions to expand the blockchain.")
 	fmt.Println("In addition, don't forget to run mine function after transatcions are collected.")
+	fmt.Println("Please make sure the UTXO set init before querying the balance of a wallet.")
+	fmt.Println("initutxoset                                         ----> Init all the UTXO sets of known wallets.")
 	fmt.Println("---------------------------------------------------------------------------------------------------------------------------------------------------------")
 	fmt.Println("createwallet -refname REFNAME                       ----> Creates and save a wallet. The refname is optional.")
 	fmt.Println("walletinfo -refname NAME -address Address           ----> Print the information of a wallet. At least one of the refname and address is required.")
@@ -42,12 +44,8 @@ func (cli *CommandLine) createBlockChain(address string) {
 }
 
 func (cli *CommandLine) balance(address string) {
-	chain := blockchain.LoadBlockChain()
-	defer chain.Database.Close()
-
 	wlt := wallet.LoadWallet(address)
-
-	balance, _ := chain.FindUTXOs(wlt.PublicKey)
+	balance := wlt.GetBalance()
 	fmt.Printf("Address:%s, Balance:%d \n", address, balance)
 }
 
@@ -89,12 +87,18 @@ func (cli *CommandLine) send(from, to string, amount int) {
 	fmt.Println("Success!")
 }
 
-// mine命令调用RunMine即可
 func (cli *CommandLine) mine() {
 	chain := blockchain.LoadBlockChain()
 	defer chain.Database.Close()
 	chain.RunMine()
 	fmt.Println("Finish Mining")
+	newblock := chain.GetCurrentBlock()
+	refList := wallet.LoadRefList()
+	for k, _ := range *refList {
+		wlt := wallet.LoadWallet(k)
+		wlt.ScanBlock(newblock)
+	}
+	fmt.Println("Finish Updating UTXO sets")
 }
 
 // 使用flag库将各命令注册即可
@@ -173,6 +177,9 @@ func (cli *CommandLine) Run() {
 	case "mine":
 		err := mineCmd.Parse(os.Args[2:])
 		utils.Handle(err)
+
+	case "initutxoset":
+		cli.iniUtxoSet()
 
 	default:
 		cli.printUsage()
@@ -320,4 +327,15 @@ func (cli *CommandLine) balanceRefName(refname string) {
 	address, err := refList.FindRef(refname)
 	utils.Handle(err)
 	cli.balance(address)
+}
+func (cli *CommandLine) iniUtxoSet() {
+	chain := blockchain.LoadBlockChain()
+	defer chain.Database.Close()
+	refList := wallet.LoadRefList()
+	for addr, _ := range *refList {
+		wlt := wallet.LoadWallet(addr)
+		utxoSet := wlt.CreateUTXOSet(chain)
+		utxoSet.DB.Close()
+	}
+	fmt.Println("Succeed in initializing UTXO sets.")
 }

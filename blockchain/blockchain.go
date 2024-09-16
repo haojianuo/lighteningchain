@@ -267,3 +267,42 @@ func (bc *BlockChain) CreateTransaction(from_PubKey, to_HashPubKey []byte,
 	tx.Sign(privkey)
 	return &tx, true
 }
+
+func (bc *BlockChain) BackUTXOs(address []byte) []transaction.UTXO {
+	var UTXOs []transaction.UTXO
+	unspentTxs := bc.FindUnspentTransactions(address)
+
+Work:
+	for _, tx := range unspentTxs {
+		for outIdx, out := range tx.Outputs {
+			if out.ToAddressRight(address) {
+				UTXOs = append(UTXOs, transaction.UTXO{tx.ID, outIdx, out})
+				continue Work // one transaction can only have one output referred to adderss
+			}
+		}
+	}
+
+	return UTXOs
+}
+
+func (chain *BlockChain) GetCurrentBlock() *Block {
+	var block *Block
+	err := chain.Database.View(func(txn *badger.Txn) error {
+
+		item, err := txn.Get(chain.LastHash)
+		utils.Handle(err)
+
+		err = item.Value(func(val []byte) error {
+			block = DeSerializeBlock(val)
+			return nil
+		})
+		utils.Handle(err)
+		return err
+	})
+	utils.Handle(err)
+	return block
+}
+
+func (bc *BlockChain) BackHeight() int64 {
+	return bc.GetCurrentBlock().Height
+}
