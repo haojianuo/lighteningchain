@@ -1,12 +1,16 @@
 package utils
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"github.com/mr-tron/base58"
 	"golang.org/x/crypto/ripemd160"
 	"lighteningchain/constcoe"
 	"log"
+	"math/big"
 	"os"
 )
 
@@ -69,4 +73,29 @@ func Address2PubHash(address []byte) []byte {
 	pubKeyHash := Base58Decode(address)
 	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-constcoe.CheckSumLength]
 	return pubKeyHash
+}
+
+func Sign(msg []byte, privKey ecdsa.PrivateKey) []byte {
+	r, s, err := ecdsa.Sign(rand.Reader, &privKey, msg)
+	Handle(err)
+	signature := append(r.Bytes(), s.Bytes()...)
+	return signature
+}
+
+func Verify(msg []byte, pubkey []byte, signature []byte) bool {
+	curve := elliptic.P256()
+	r := big.Int{}
+	s := big.Int{}
+	sigLen := len(signature)
+	r.SetBytes(signature[:(sigLen / 2)])
+	s.SetBytes(signature[(sigLen / 2):])
+
+	x := big.Int{}
+	y := big.Int{}
+	keyLen := len(pubkey)
+	x.SetBytes(pubkey[:(keyLen / 2)])
+	y.SetBytes(pubkey[(keyLen / 2):])
+
+	rawPubKey := ecdsa.PublicKey{Curve: curve, X: &x, Y: &y}
+	return ecdsa.Verify(&rawPubKey, msg, &r, &s)
 }

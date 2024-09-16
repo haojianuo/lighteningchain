@@ -1,22 +1,26 @@
 package transaction
 
-import "bytes"
+import (
+	"bytes"
+	"lighteningchain/utils"
+)
 
 type TxOutput struct {
-	Value     int
-	ToAddress []byte
+	Value      int
+	HashPubKey []byte
 }
 
 type TxInput struct {
-	TxID        []byte
-	OutIdx      int
-	FromAddress []byte
+	TxID   []byte
+	OutIdx int
+	PubKey []byte
+	Sig    []byte
 }
 
 func (in *TxInput) FromAddressRight(address []byte) bool {
-	return bytes.Equal(in.FromAddress, address)
+	return bytes.Equal(in.PubKey, address)
 }
 
 func (out *TxOutput) ToAddressRight(address []byte) bool {
-	return bytes.Equal(out.ToAddress, address)
+	return bytes.Equal(out.HashPubKey, utils.PublicKeyHash(address))
 }
