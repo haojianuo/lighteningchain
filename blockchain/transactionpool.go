@@ -3,7 +3,6 @@ package blockchain
 import (
 	"bytes"
 	"encoding/gob"
-	"io/ioutil"
 	"lighteningchain/constcoe"
 	"lighteningchain/transaction"
 	"lighteningchain/utils"
@@ -23,7 +22,7 @@ func (tp *TransactionPool) SaveFile() {
 	encoder := gob.NewEncoder(&content)
 	err := encoder.Encode(tp)
 	utils.Handle(err)
-	err = ioutil.WriteFile(constcoe.TransactionPoolFile, content.Bytes(), 0644)
+	err = os.WriteFile(constcoe.TransactionPoolFile, content.Bytes(), 0644)
 	utils.Handle(err)
 }
 
@@ -34,7 +33,7 @@ func (tp *TransactionPool) LoadFile() error {
 
 	var transactionPool TransactionPool
 
-	fileContent, err := ioutil.ReadFile(constcoe.TransactionPoolFile)
+	fileContent, err := os.ReadFile(constcoe.TransactionPoolFile)
 	if err != nil {
 		return err
 	}
